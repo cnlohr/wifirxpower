@@ -142,7 +142,7 @@ int get_color( int nr )
 	v *= .66666666;
 	if( v > 0.66666666 ) v = 0.66666666;
 	if( v < 0 ) v = 0;
-	return HSVtoHEX( v, 1, 0.3 );
+	return HSVtoHEX( v, 1, 1.0 );
 }
 
 #define POWERHISTORY 1024
