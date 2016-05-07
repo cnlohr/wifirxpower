@@ -97,7 +97,9 @@ unsigned long HSVtoHEX( float hue, float sat, float value )
 	return (ob<<16) | (og<<8) | ora;
 }
 
-int GetQuality( const char * interface )
+int first = 0;
+
+int GetQuality( const char * interface, int * noise )
 {
 	int sockfd;
 	struct iw_statistics stats;
@@ -115,25 +117,31 @@ int GetQuality( const char * interface )
 
 	/* Any old socket will do, and a datagram socket is pretty cheap */
 	if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		perror("Could not create simple datagram socket");
+		if( first ) perror("Could not create simple datagram socket");
+		first = 0;
 		//exit(EXIT_FAILURE);
 		return -1;
 	}
 
 	/* Perform the ioctl */
 	if(ioctl(sockfd, SIOCGIWSTATS, &req) == -1) {
-		perror("Error performing SIOCGIWSTATS");
+		if( first ) perror("Error performing SIOCGIWSTATS");
+		first = 0;
 		close(sockfd);
 		return -1;
 	}
 
 	close(sockfd);
 
-	return stats.qual.level;
+	first = 0;
+	if( noise ) *noise = -256+stats.qual.noise;
+
+	return -256+stats.qual.level;
 }
 
-int min = 5800;
-int max = 6600;
+#define TITER 30
+double min = -90;
+double max = -50;
 
 int get_color( int nr )
 {
@@ -146,7 +154,7 @@ int get_color( int nr )
 }
 
 #define POWERHISTORY 1024
-int powers[POWERHISTORY];
+double powers[POWERHISTORY];
 short screenx, screeny;
 
 int main( int argc, char ** argv )
@@ -184,7 +192,7 @@ int main( int argc, char ** argv )
 		max = atoi( argv[4] );
 	}
 
-	printf( "MIN: %d / MAX: %d\n", min, max );
+	printf( "MIN: %f / MAX: %f\n", min, max );
 
 	CNFGBGColor = 0x800000;
 	CNFGDialogColor = 0x444444;
@@ -192,13 +200,20 @@ int main( int argc, char ** argv )
 
 	while(1)
 	{
-		int i, j = 0;
+		int i;
+		double j = 0;
+		int noise;
+		double noisetot = 0;
+		first = 1;
 		for( i = 0; i < 30; i++ )
 		{
-			j += GetQuality( argv[1] );
+			j += GetQuality( argv[1], &noise );
+			noisetot += noise;
 			usleep(2000);
 		}
-		printf( "%d\n", j );
+		j/=TITER;
+		noise/=TITER;
+		printf( "%4.1f %4.1f\n", j, noisetot );
 		powers[pl] = j;
 		pl++;
 		if( pl >= POWERHISTORY ) pl = 0;
@@ -229,7 +244,7 @@ int main( int argc, char ** argv )
 			while( k < 0 )
 				k += POWERHISTORY;
 			CNFGColor( get_color( powers[k] ) );
-			CNFGTackSegment( i, screeny, i, screeny - powers[k]/30 );
+			CNFGTackSegment( i, 0, i, -(powers[k]+20)*(screeny/(100.0-20)) );
 		}
 		CNFGColor( 0xffffff );
 
