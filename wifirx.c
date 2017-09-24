@@ -192,6 +192,9 @@ int get_color( int nr )
 
 #define POWERHISTORY 1024
 double powers[POWERHISTORY];
+double tx_rates[POWERHISTORY];
+double rx_rates[POWERHISTORY];
+
 short screenx, screeny;
 unsigned char iw_command_buff[100];
 
@@ -259,9 +262,11 @@ int main( int argc, char ** argv )
 
 		GetBitRates(iw_command_buff, &tx_bitrate, &rx_bitrate);
 
-		printf( "%4.1f %4.1f TX: %d RX: %d\n", j, noisetot, tx_bitrate, rx_bitrate);
+		printf( "Sig: %4.1f dBm Noise: %4.1f \nTX: %d MBit/s (red) RX: %d MBit/s (green)\n", j, noisetot, tx_bitrate, rx_bitrate);
 
 		powers[pl] = j;
+		tx_rates[pl] = tx_bitrate;
+		rx_rates[pl] = rx_bitrate;
 		pl++;
 		if( pl >= POWERHISTORY ) pl = 0;
 
@@ -292,6 +297,15 @@ int main( int argc, char ** argv )
 				k += POWERHISTORY;
 			CNFGColor( get_color( powers[k] ) );
 			CNFGTackSegment( i, 0, i, -(powers[k]+20)*(screeny/(100.0-20)) );
+
+			CNFGColor(0xFF); //red
+			CNFGTackPixel(i, tx_rates[k]);
+			CNFGTackPixel(i, tx_rates[k]+1);
+
+			CNFGColor(0xFF00); //green
+			CNFGTackPixel(i, rx_rates[k]);
+			CNFGTackPixel(i, rx_rates[k]+1);
+
 		}
 		CNFGColor( 0xffffff );
 
