@@ -99,6 +99,43 @@ unsigned long HSVtoHEX( float hue, float sat, float value )
 
 int first = 0;
 
+#define TX_BITRATE_LINE 14
+#define RX_BITRATE_LINE 15
+#define MBIT_OFFSET		12
+
+void GetBitRates(const char * command, int *tx_bitrate, int *rx_bitrate)
+{
+	FILE *fp;
+	char line[1035];
+	int i = 0;
+
+	/* Open the command for reading. */
+	fp = popen(command, "r");
+	if (fp == NULL) {
+		printf("Failed to run command\n");
+		exit(1);
+	}
+
+	/* Read the output a line at a time*/
+	while (fgets(line, sizeof(line) - 1, fp) != NULL)
+	{
+		if ((i == TX_BITRATE_LINE))
+		{
+			//printf("%s", line);
+			*tx_bitrate = strtol(line+MBIT_OFFSET,0,10);
+		}
+
+		if (i == RX_BITRATE_LINE)
+		{
+			//printf("%s", line);
+			*rx_bitrate = strtol(line+MBIT_OFFSET,0,10);
+		}
+		i++;
+	}
+
+	pclose(fp);
+}
+
 int GetQuality( const char * interface, int * noise )
 {
 	int sockfd;
@@ -156,6 +193,7 @@ int get_color( int nr )
 #define POWERHISTORY 1024
 double powers[POWERHISTORY];
 short screenx, screeny;
+unsigned char iw_command_buff[100];
 
 int main( int argc, char ** argv )
 {
@@ -194,6 +232,8 @@ int main( int argc, char ** argv )
 
 	printf( "MIN: %f / MAX: %f\n", min, max );
 
+	sprintf(iw_command_buff,"iw dev %s station dump", argv[1]);
+
 	CNFGBGColor = 0x800000;
 	CNFGDialogColor = 0x444444;
 	CNFGSetup( "WifiRX", 640, 480 );
@@ -205,6 +245,9 @@ int main( int argc, char ** argv )
 		int noise;
 		double noisetot = 0;
 		first = 1;
+		int tx_bitrate;
+		int rx_bitrate;
+
 		for( i = 0; i < 30; i++ )
 		{
 			j += GetQuality( argv[1], &noise );
@@ -213,7 +256,11 @@ int main( int argc, char ** argv )
 		}
 		j/=TITER;
 		noise/=TITER;
-		printf( "%4.1f %4.1f\n", j, noisetot );
+
+		GetBitRates(iw_command_buff, &tx_bitrate, &rx_bitrate);
+
+		printf( "%4.1f %4.1f TX: %d RX: %d\n", j, noisetot, tx_bitrate, rx_bitrate);
+
 		powers[pl] = j;
 		pl++;
 		if( pl >= POWERHISTORY ) pl = 0;
